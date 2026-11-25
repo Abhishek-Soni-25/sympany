@@ -1,0 +1,21 @@
+# Production dependencies (the Docker image installs exactly these).
+fastapi>=0.110.0              # backend API serving the React dashboard
+uvicorn[standard]>=0.29.0     # ASGI server
+python-multipart>=0.0.9       # multipart uploads (Media Compliance video)
+pyyaml>=6.0                   # config.yaml
+python-dotenv>=1.0.0          # .env for local development (unused on AWS)
+tzdata>=2024.1                # Europe/Zurich for zoneinfo (slim images have no system tz data)
+
+# AWS: Bedrock, DynamoDB, SNS, SSM Parameter Store, ECS (boto3); Transcribe streaming;
+# ALB / Cognito JWT verification (cryptography).
+boto3>=1.40.0
+amazon-transcribe>=0.6.4
+cryptography>=42.0.0
+
+# Media Compliance + collection helpers
+youtube-transcript-api>=0.6.2 # YouTube caption transcript for video links / YouTube posts
+Pillow>=10.0.0                # normalise any uploaded image to a JPEG the vision model accepts
+pillow-heif>=0.16.0           # decode iPhone HEIC/AVIF stills (needs libheif in the image)
+vaderSentiment>=3.3.2         # local sentiment pre-pass (degrades gracefully if missing)
+
+# (Bright Data + Apify connectors use the stdlib urllib — no extra dependency)

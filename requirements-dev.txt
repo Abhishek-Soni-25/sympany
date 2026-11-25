@@ -1,0 +1,7 @@
+# Local development only — NOT installed in the Docker image.
+-r requirements.txt
+moto[dynamodb,ssm,sns,ecs]>=5.0  # offline tests of the AWS code paths
+pyflakes>=3.0
+
+# Optional live connectors (only if a channel is switched to mode: live)
+# telethon>=1.36.0   praw>=7.7.1   tweepy>=4.14.0

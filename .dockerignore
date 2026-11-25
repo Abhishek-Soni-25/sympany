@@ -1,0 +1,20 @@
+# Keep the build context small + never ship secrets / local junk
+.env
+.env.*
+!.env.example
+.venv/
+__pycache__/
+**/__pycache__/
+*.pyc
+*.session
+*.session-journal
+*.log
+*.zip
+.git/
+.claude/
+frontend/node_modules/
+frontend/dist/
+# Local-only state (connector cursors, raw comment dumps, scan status)
+data/state/
+live1.json
+live2.json

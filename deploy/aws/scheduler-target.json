@@ -1,0 +1,17 @@
+{
+  "Arn": "arn:aws:ecs:eu-central-2:123456789012:cluster/sympany-socmon",
+  "RoleArn": "<SCHEDULER_ROLE_ARN>",
+  "EcsParameters": {
+    "TaskDefinitionArn": "<SCAN_TASK_DEFINITION_ARN>",
+    "TaskCount": 1,
+    "LaunchType": "FARGATE",
+    "NetworkConfiguration": {
+      "awsvpcConfiguration": {
+        "Subnets": ["<PRIVATE_SUBNET_1A>", "<PRIVATE_SUBNET_1B>"],
+        "SecurityGroups": ["<SCAN_SECURITY_GROUP_ID>"],
+        "AssignPublicIp": "DISABLED"
+      }
+    }
+  },
+  "RetryPolicy": {"MaximumRetryAttempts": 2, "MaximumEventAgeInSeconds": 3600}
+}

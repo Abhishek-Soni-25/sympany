@@ -1,0 +1,36 @@
+{
+  "family": "sympany-socmon-scan",
+  "requiresCompatibilities": ["FARGATE"],
+  "networkMode": "awsvpc",
+  "cpu": "2048",
+  "memory": "4096",
+  "runtimePlatform": {"operatingSystemFamily": "LINUX", "cpuArchitecture": "X86_64"},
+  "executionRoleArn": "<ECS_TASKS_ROLE_ARN>",
+  "taskRoleArn": "<ECS_TASKS_ROLE_ARN>",
+  "containerDefinitions": [
+    {
+      "name": "scan",
+      "image": "123456789012.dkr.ecr.eu-central-2.amazonaws.com/sympany-socmon:latest",
+      "essential": true,
+      "command": ["python", "-m", "src.scan_job", "--job", "all"],
+      "environment": [
+        {"name": "AWS_REGION", "value": "eu-central-2"},
+        {"name": "DYNAMODB_TABLE", "value": "sympany-socmon-data"},
+        {"name": "DYNAMODB_AUDIT_TABLE", "value": "sympany-socmon-audit"},
+        {"name": "ALERT_TOPIC_ARN", "value": "arn:aws:sns:eu-central-2:123456789012:sympany-socmon-alerts"}
+      ],
+      "secrets": [
+        {"name": "APIFY_TOKEN", "valueFrom": "arn:aws:ssm:eu-central-2:123456789012:parameter/sympany-socmon/APIFY_TOKEN"},
+        {"name": "BRIGHTDATA_API_KEY", "valueFrom": "arn:aws:ssm:eu-central-2:123456789012:parameter/sympany-socmon/BRIGHTDATA_API_KEY"}
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/sympany-socmon-scan",
+          "awslogs-region": "eu-central-2",
+          "awslogs-stream-prefix": "scan"
+        }
+      }
+    }
+  ]
+}

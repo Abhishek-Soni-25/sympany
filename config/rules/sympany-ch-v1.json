@@ -1,0 +1,557 @@
+{
+  "ruleSetId": "sympany-ch-v1",
+  "version": "1.0.0",
+  "effectiveFrom": "2026-03-25",
+  "confidenceFloor": { "High": 0.85, "Medium": 0.75, "Low": 0.75 },
+  "phraseLists": {
+    "riskWarning": [],
+    "licensingStatement": [],
+    "pastPerformanceCaveat": []
+  },
+  "rules": [
+    {
+      "id": "D-01",
+      "type": "prohibition",
+      "title": "Customer policy or benefit statement visible",
+      "description": "A customer's policy certificate, benefit statement, invoice reimbursement or premium invoice is visible, whether or not identifiers are redacted",
+      "severity": "High",
+      "status": "active",
+      "dependency": null,
+      "detection": {
+        "modalities": ["image_text", "video_frame_text"],
+        "signal": "OCR finds two or more policy / benefit statement field labels in one frame: Policy Number, Insured Person, Insurance Number, Insurance Model, Deductible, Monthly Premium, Cost Sharing, Date of Treatment, Benefit Statement",
+        "template": "entity",
+        "params": {
+          "labelSet": ["Policy Number", "Insured Person", "Insurance Number", "Insurance Model", "Deductible", "Monthly Premium", "Cost Sharing", "Date of Treatment", "Benefit Statement"],
+          "minCount": 2,
+          "scope": "frame"
+        }
+      },
+      "basis": "Swiss FADP (nFADP/revDSG) — health data is sensitive personal data; ATSG Art. 33 duty of confidentiality",
+      "reviewerNote": "A visible policy certificate or benefit statement exposes a real insured person's cover, deductible and treatment data even when the name is blacked out. Health insurance data is sensitive personal data under the FADP.",
+      "suggestedFix": "Remove any real policy certificate, benefit statement or premium invoice. Use an approved Sympany sample document or a fully synthetic mock-up instead.",
+      "enabled": true
+    },
+    {
+      "id": "D-02",
+      "type": "prohibition",
+      "title": "Customer personal data visible in a product context",
+      "description": "Customer personal data visible (name, AHV number, contact details, face) in a sales or product context",
+      "severity": "High",
+      "status": "active",
+      "dependency": null,
+      "detection": {
+        "modalities": ["image_text", "video_frame_text", "image_face"],
+        "signal": "PII pattern match on extracted text (AHV/AVS number, Swiss phone number, e-mail); face detection where a product entity is also present",
+        "template": "regex",
+        "params": {
+          "patterns": ["ahv", "ch_phone", "email"],
+          "requiresProductContext": true,
+          "faceContext": true
+        }
+      },
+      "basis": "Swiss FADP (nFADP/revDSG) Art. 6 & 30 — processing principles and consent",
+      "reviewerNote": "An insured person's name, AHV number, contact details or face shown alongside a Sympany product turns a marketing asset into a disclosure of personal data.",
+      "suggestedFix": "Remove or fully pseudonymise the customer identifier. Do not rely on partial redaction. Obtain written consent and Sympany Legal sign-off before featuring any identifiable person.",
+      "enabled": true
+    },
+    {
+      "id": "D-03",
+      "type": "prohibition",
+      "title": "Unsubstantiated premium-saving figure quoted",
+      "description": "A specific premium saving, discount or reduction percentage is quoted without the basis it depends on (region, age group, deductible, insurance model)",
+      "severity": "High",
+      "status": "active",
+      "dependency": null,
+      "detection": {
+        "modalities": ["image_text", "video_frame_text", "transcript", "caption"],
+        "signal": "Numeric percentage in the same text block as: save, saving, cheaper, discount, rebate, premium reduction, lower premium",
+        "template": "regex",
+        "params": {
+          "pattern": "percentage",
+          "nearTerms": ["save", "saving", "cheaper", "discount", "rebate", "premium reduction", "lower premium"],
+          "proximity": "text_block"
+        }
+      },
+      "basis": "UWG/LCD Art. 3 para. 1 lit. b (misleading statements); KVG/LAMal Art. 62 (premium reductions for alternative models)",
+      "reviewerNote": "Premium savings for the family doctor, Telmed or HMO models and for higher deductibles vary by premium region, age group and model. A blanket percentage presents a best case as typical, which the UWG treats as misleading.",
+      "suggestedFix": "Remove the saving percentage, or state the exact example it is based on (premium region, age group, deductible, model, year) and refer to the official FOPH premium data.",
+      "enabled": true
+    },
+    {
+      "id": "D-04",
+      "type": "prohibition",
+      "title": "Premiums, cover or acceptance described as guaranteed or free",
+      "description": "Premiums described as guaranteed or frozen, cover described as free or unlimited, or supplementary insurance acceptance implied to need no health declaration",
+      "severity": "High",
+      "status": "active",
+      "dependency": null,
+      "detection": {
+        "modalities": ["image_text", "video_frame_text", "transcript", "caption"],
+        "signal": "Fixed lexicon: guaranteed, guarantee, premium freeze, frozen premiums, no premium increase, for free, free of charge, everything covered, no health questions",
+        "template": "lexicon",
+        "params": {
+          "terms": ["guaranteed", "guarantee", "premium freeze", "frozen premiums", "no premium increase", "for free", "free of charge", "everything covered", "no health questions"]
+        }
+      },
+      "basis": "UWG/LCD Art. 3 para. 1 lit. b; KVG/LAMal Art. 61 & KVAG Art. 16 (premiums are set annually and approved by the FOPH)",
+      "reviewerNote": "Basic insurance premiums are reset every year and approved by the FOPH, and supplementary insurance is underwritten on a health declaration. Promising a premium freeze, free cover or guaranteed acceptance misleads a reasonable consumer.",
+      "suggestedFix": "Delete any language promising guaranteed or frozen premiums, free cover or acceptance without a health declaration. Describe the actual premium mechanism and underwriting.",
+      "enabled": true
+    },
+    {
+      "id": "D-05",
+      "type": "prohibition",
+      "title": "Customer testimonial or chat screenshot as proof",
+      "description": "Customer testimonial, chat screenshot or forwarded customer message used as proof of savings or claim payouts",
+      "severity": "High",
+      "status": "active",
+      "dependency": null,
+      "detection": {
+        "modalities": ["image_text", "video_frame_text"],
+        "signal": "Messaging-app UI detected (chat bubbles, read receipts, timestamp rail) together with a currency amount or a percentage",
+        "template": "vision",
+        "params": {
+          "visualCue": "messaging_ui",
+          "coPresent": ["currency_amount", "percentage"]
+        }
+      },
+      "basis": "UWG/LCD Art. 3 para. 1 lit. b; FADP consent requirements; SLK principles on testimonials",
+      "reviewerNote": "A customer chat screenshot or testimonial used as proof of savings or payouts cannot be substantiated and usually lacks the customer's documented consent.",
+      "suggestedFix": "Remove the testimonial, chat screenshot or forwarded customer message, or replace it with an approved testimonial that has documented written consent and no individual figures.",
+      "enabled": true
+    },
+    {
+      "id": "D-06",
+      "type": "prohibition",
+      "title": "Personalised insurance recommendation in public content",
+      "description": "A personalised recommendation (insurance model, deductible or supplementary product) directed at an individual in public content",
+      "severity": "High",
+      "status": "advisory",
+      "dependency": null,
+      "detection": {
+        "modalities": ["image_text", "transcript", "caption"],
+        "signal": "Second-person imperative plus a named product. Flags for review only; the information / advice line is a legal judgement the engine will not make",
+        "template": "vision",
+        "params": {
+          "linguisticCue": "second_person_imperative",
+          "coPresent": ["product_entity"]
+        }
+      },
+      "basis": "ISA/VAG Art. 45 (intermediary information duties). Advisory until Sympany Legal sets the boundary",
+      "reviewerNote": "Telling an individual which model, deductible or supplementary product to take may cross from general information into advice that requires a needs analysis. Where that line sits is a legal judgement, so the engine flags but does not block.",
+      "suggestedFix": "Reframe as general information, or route the individual to a Sympany customer advisor or the mySympany premium calculator for personal advice.",
+      "enabled": true
+    },
+    {
+      "id": "D-07",
+      "type": "prohibition",
+      "title": "Urgency, scarcity or pressure language",
+      "description": "Urgency, scarcity or pressure language used to drive an insurance switch or purchase",
+      "severity": "Medium",
+      "status": "advisory",
+      "dependency": null,
+      "detection": {
+        "modalities": ["image_text", "transcript", "caption"],
+        "signal": "Lexicon: last chance, closing soon, limited slots, act now, offer ends, only X left",
+        "template": "lexicon",
+        "params": {
+          "terms": ["last chance", "closing soon", "limited slots", "act now", "offer ends", "only", "left"]
+        }
+      },
+      "basis": "UWG/LCD Art. 3 para. 1 lit. h (aggressive sales methods). Advisory: legitimate when referring to the 30 November switching deadline",
+      "reviewerNote": "Pressure language can be an aggressive sales method, but reminders of the statutory 30 November basic insurance switching deadline are legitimate, so the call is left to a reviewer.",
+      "suggestedFix": "Remove pressure language tied to a product decision. Time limits are acceptable only for genuine deadlines such as the 30 November switching date or event registration.",
+      "enabled": true
+    },
+    {
+      "id": "D-08",
+      "type": "prohibition",
+      "title": "Direct comparison against a named competitor",
+      "description": "Direct comparison against a named competitor health insurer, its premiums or its benefits",
+      "severity": "Medium",
+      "status": "advisory",
+      "dependency": null,
+      "detection": {
+        "modalities": ["image_text", "transcript", "caption"],
+        "signal": "Competitor entity detected alongside a comparative construction or a figure",
+        "template": "entity",
+        "params": {
+          "entityList": ["CSS", "Helsana", "SWICA", "Visana", "Groupe Mutuel", "Sanitas", "Concordia", "KPT", "Assura", "Atupri", "ÖKK", "EGK"],
+          "coPresent": ["comparative_construction", "figure"]
+        }
+      },
+      "basis": "UWG/LCD Art. 3 para. 1 lit. e (comparative advertising). Advisory pending Sympany comparative advertising policy",
+      "reviewerNote": "A premium or benefit comparison against a named insurer must be accurate, like-for-like (same region, age group, deductible and model) and sourced. Whether it is permitted at all depends on Sympany's comparative advertising policy.",
+      "suggestedFix": "Remove the named-competitor comparison, or make it like-for-like, cite the source (e.g. FOPH premium data) and reference year, and align it with Sympany's comparative advertising policy.",
+      "enabled": true
+    },
+    {
+      "id": "D-09",
+      "type": "prohibition",
+      "title": "Intermediary recruitment quoting commission income",
+      "description": "Broker or intermediary recruitment content quoting commission or income levels without the industry-agreement commission caps and variable-earnings context",
+      "severity": "Medium",
+      "status": "pending_config",
+      "dependency": "Needs Sympany intermediary recruitment policy",
+      "detection": {
+        "modalities": ["image_text", "caption"],
+        "signal": "Job-ad layout with a salary, commission or income range plus broker / intermediary keywords",
+        "template": "vision",
+        "params": {
+          "visualCue": "job_ad_layout",
+          "coPresent": ["income_range", "recruitment_keywords"]
+        }
+      },
+      "basis": "KVG/LAMal Art. 4a binding industry agreement on intermediaries (santésuisse / curafutura Branchenvereinbarung) — commission caps. Needs Sympany intermediary recruitment policy",
+      "reviewerNote": "Recruitment posts quoting commission income can mislead on the capped, variable nature of intermediary earnings under the binding industry agreement. Requires Sympany's intermediary recruitment policy before it can be enforced.",
+      "suggestedFix": "State that intermediary earnings are variable and capped under the industry agreement, and include the FINMA registration and training requirements, per the recruitment policy.",
+      "enabled": false
+    },
+    {
+      "id": "D-10",
+      "type": "prohibition",
+      "title": "Award or rating claim without year and issuer",
+      "description": "Award, rating or test-winner claim (e.g. customer satisfaction survey, comparison portal rating) without qualifying year and issuing body",
+      "severity": "Low",
+      "status": "advisory",
+      "dependency": null,
+      "detection": {
+        "modalities": ["image_text", "caption"],
+        "signal": "Award / rating keyword without a four-digit year and an issuer in the same frame",
+        "template": "lexicon",
+        "params": {
+          "terms": ["test winner", "best health insurer", "best insurer", "top rated", "customer satisfaction award", "Comparis.ch", "Comparis survey", "Moneyland", "K-Tipp", "Bonus.ch"],
+          "requiresQualifiers": ["four_digit_year", "issuer"]
+        }
+      },
+      "basis": "UWG/LCD Art. 3 para. 1 lit. b; SLK (Swiss Commission for Fairness) principles; Sympany brand policy",
+      "reviewerNote": "A rating or award claim without its qualifying year and issuing body can overstate current standing. A housekeeping defect rather than a consumer harm.",
+      "suggestedFix": "Add the qualifying year and the issuing body to the claim (e.g. \"Customer satisfaction 2025, Comparis survey\").",
+      "enabled": true
+    },
+    {
+      "id": "D-11",
+      "type": "prohibition",
+      "title": "Unapproved overlay or edit on approved creative",
+      "description": "Unapproved overlay, edit or personal opinion added to Sympany-approved creative",
+      "severity": "Medium",
+      "status": "pending_config",
+      "dependency": "Sympany brand governance. Needs creative library and template hash registry",
+      "detection": {
+        "modalities": ["image_text", "video_frame_text"],
+        "signal": "Template hash mismatch; text overlay outside approved zones",
+        "template": "vision",
+        "params": {
+          "check": "template_hash_and_zone"
+        }
+      },
+      "basis": "Sympany brand governance. Needs creative library and template hash registry",
+      "reviewerNote": "Overlays or edits added to an approved Sympany creative can undo the approval. Requires the creative library and template hash registry to detect.",
+      "suggestedFix": "Revert to the approved creative. Route any overlay or edit through the Sympany approval workflow.",
+      "enabled": false
+    },
+    {
+      "id": "D-12",
+      "type": "prohibition",
+      "title": "Off-brand logo, identity or hashtag",
+      "description": "Off-brand Sympany logo treatment, unapproved visual identity or unapproved hashtag",
+      "severity": "Low",
+      "status": "pending_config",
+      "dependency": "Sympany brand governance. Needs brand asset pack and hashtag allowlist",
+      "detection": {
+        "modalities": ["image_text", "caption"],
+        "signal": "Logo integrity check; hashtag allowlist match",
+        "template": "vision",
+        "params": {
+          "check": "logo_integrity_and_hashtag_allowlist"
+        }
+      },
+      "basis": "Sympany brand governance. Needs brand asset pack and hashtag allowlist",
+      "reviewerNote": "Off-brand logo treatment or an unapproved hashtag is a brand governance defect. Requires the Sympany brand asset pack and hashtag allowlist to detect.",
+      "suggestedFix": "Use the approved Sympany logo treatment and only hashtags on the brand allowlist.",
+      "enabled": false
+    },
+    {
+      "id": "A-01",
+      "type": "requirement",
+      "title": "Key limitation stated where a product is named",
+      "description": "Where a product is named, its key limitation appears in the same asset (e.g. supplementary insurance is subject to a health declaration; model restrictions apply)",
+      "severity": "Medium",
+      "status": "active",
+      "dependency": "UWG/LCD Art. 3; VVG/LCA Art. 3 pre-contractual information. Needs approved limitation phrase list",
+      "detection": {
+        "modalities": ["image_text", "caption", "transcript"],
+        "signal": "Product entity detected and no approved limitation phrase found in frame text, caption or transcript of the same asset",
+        "template": "phrase_absence",
+        "params": {
+          "phraseList": "riskWarning",
+          "trigger": "product_entity"
+        },
+        "phraseList": "riskWarning"
+      },
+      "basis": "UWG/LCD Art. 3; VVG/LCA Art. 3. Needs approved phrase list",
+      "reviewerNote": "Where a product is named, its key limitation must appear in the same asset — for supplementary insurance that acceptance depends on a health declaration, for alternative models that the chosen first point of contact must be used. The check runs against Sympany's approved wording.",
+      "suggestedFix": "Add an approved limitation statement (e.g. \"Supplementary insurance is subject to a health declaration\") to the same asset as the product.",
+      "enabled": true
+    },
+    {
+      "id": "A-02",
+      "type": "requirement",
+      "title": "Advisor identification and intermediary status stated",
+      "description": "Where a product is named, the poster is identified as a Sympany employee or a FINMA-registered insurance intermediary, with tied / untied status stated",
+      "severity": "Medium",
+      "status": "active",
+      "dependency": "ISA/VAG Art. 45. Needs approved intermediary statement phrase list",
+      "detection": {
+        "modalities": ["image_text", "caption", "transcript"],
+        "signal": "Product entity detected and no advisor identification or intermediary status statement in the same asset",
+        "template": "phrase_absence",
+        "params": {
+          "phraseList": "licensingStatement",
+          "trigger": "product_entity"
+        },
+        "phraseList": "licensingStatement"
+      },
+      "basis": "ISA/VAG Art. 45 (intermediary information duties); FINMA register of insurance intermediaries",
+      "reviewerNote": "Where a product is named, the poster must be identified as a Sympany employee or registered intermediary and state whether they are tied or untied. The check runs against Sympany's approved intermediary wording.",
+      "suggestedFix": "Add the advisor's identification and tied / untied intermediary status, using approved wording, to the same asset.",
+      "enabled": true
+    },
+    {
+      "id": "A-03",
+      "type": "requirement",
+      "title": "Premium history or comparison is sourced and dated",
+      "description": "Where premium history, average premiums or premium development figures appear, the source and reference year appear in the same asset",
+      "severity": "Medium",
+      "status": "active",
+      "dependency": "UWG/LCD Art. 3 para. 1 lit. b. Needs approved source & reference-date wording",
+      "detection": {
+        "modalities": ["image_text", "video_frame_text", "caption", "transcript"],
+        "signal": "Premium history or comparison content detected and no approved source / reference-date phrase in the same asset",
+        "template": "phrase_absence",
+        "params": {
+          "phraseList": "pastPerformanceCaveat",
+          "trigger": "historical_performance"
+        },
+        "phraseList": "pastPerformanceCaveat"
+      },
+      "basis": "UWG/LCD Art. 3 para. 1 lit. b. Needs approved source wording",
+      "reviewerNote": "Where premium history, averages or year-on-year premium development appear, the source (e.g. FOPH premium data) and the reference year must appear in the same asset, and past premium development must not be presented as a promise for future years.",
+      "suggestedFix": "Add the approved source and reference-date note (e.g. \"Source: FOPH premium data 2026; future premiums may differ\") to the same asset.",
+      "enabled": true
+    },
+    {
+      "id": "A-04",
+      "type": "requirement",
+      "title": "Content dated and version-tagged for the register",
+      "description": "Content is dated and version-tagged for the Sympany digital advertising register",
+      "severity": "Low",
+      "status": "active",
+      "dependency": null,
+      "detection": {
+        "modalities": ["metadata"],
+        "signal": "Metadata completeness check at submission",
+        "template": "metadata",
+        "params": {
+          "requiredFields": ["date", "version"]
+        }
+      },
+      "basis": "Sympany marketing governance; FINMA supervisory expectations on record-keeping",
+      "reviewerNote": "The digital advertising register requires each asset to be dated and version-tagged so it can be traced. A traceability defect, not a consumer harm.",
+      "suggestedFix": "Add a submission date and version tag to the asset metadata before publishing.",
+      "enabled": true
+    },
+    {
+      "id": "A-05",
+      "type": "requirement",
+      "title": "General-information notice on educational content",
+      "description": "A general-information notice (\"this is general information; cover is governed by the policy terms\") is present on educational content",
+      "severity": "Medium",
+      "status": "advisory",
+      "dependency": null,
+      "detection": {
+        "modalities": ["image_text", "caption", "transcript"],
+        "signal": "Content classified as educational with no general-information notice. Advisory because the classification is itself a judgement",
+        "template": "vision",
+        "params": {
+          "classification": "educational",
+          "requiresPhrase": "advice_limitation"
+        }
+      },
+      "basis": "UWG/LCD Art. 3; VVG/LCA Art. 3",
+      "reviewerNote": "Educational content (e.g. how deductibles or the Telmed model work) should carry a general-information notice. Whether content is educational is itself a judgement, so the engine flags but does not block.",
+      "suggestedFix": "Add a notice such as \"This is general information. Your cover is governed by the policy terms and conditions (GTC/AVB).\"",
+      "enabled": true
+    },
+    {
+      "id": "A-06",
+      "type": "requirement",
+      "title": "Paid or incentivised content is labelled",
+      "description": "Paid, sponsored or incentivised content (influencer, referral or broker promotion) is clearly labelled",
+      "severity": "Medium",
+      "status": "advisory",
+      "dependency": null,
+      "detection": {
+        "modalities": ["image_text", "caption", "transcript"],
+        "signal": "Referral code, promo link or affiliate tag present without a disclosure label",
+        "template": "regex",
+        "params": {
+          "patterns": ["referral_code", "promo_link", "affiliate_tag"],
+          "requiresDisclosureLabel": true
+        }
+      },
+      "basis": "UWG/LCD Art. 2 & 3 (hidden advertising); SLK principles on recognisability of commercial communication. Less relevant where content carries Sympany branding",
+      "reviewerNote": "Paid, sponsored or incentivised content must be recognisable as advertising. Less relevant where the content already carries Sympany branding, so it is advisory.",
+      "suggestedFix": "Add a clear paid, sponsored or incentivised disclosure label (e.g. #ad / #Werbung) alongside any referral code, promo link or affiliate tag.",
+      "enabled": true
+    },
+    {
+      "id": "A-07",
+      "type": "requirement",
+      "title": "Disclosures in frame and not truncated",
+      "description": "Disclosures are in frame, not truncated and not placed behind a link",
+      "severity": "Medium",
+      "status": "pending_config",
+      "dependency": "UWG/LCD Art. 3. Needs Sympany legibility thresholds",
+      "detection": {
+        "modalities": ["image_text", "video_frame_text"],
+        "signal": "Disclosure text located; bounding box height ratio and contrast ratio against threshold",
+        "template": "vision",
+        "params": {
+          "check": "bbox_height_ratio_and_contrast"
+        }
+      },
+      "basis": "UWG/LCD Art. 3. Needs Sympany legibility thresholds",
+      "reviewerNote": "Disclosures must be in frame, legible and not hidden behind a link. Requires Sympany's legibility thresholds (height and contrast) before it can be enforced.",
+      "suggestedFix": "Place disclosures in frame at the required size and contrast, not behind a link.",
+      "enabled": false
+    },
+    {
+      "id": "A-08",
+      "type": "requirement",
+      "title": "Video disclosures persist long enough to read",
+      "description": "Video disclosures remain on screen long enough to be read",
+      "severity": "Medium",
+      "status": "pending_config",
+      "dependency": "UWG/LCD Art. 3. Needs Sympany minimum duration",
+      "detection": {
+        "modalities": ["video_frame_text"],
+        "signal": "Frame-persistence count for the disclosure region against a minimum duration",
+        "template": "vision",
+        "params": {
+          "check": "disclosure_frame_persistence"
+        }
+      },
+      "basis": "UWG/LCD Art. 3. Needs Sympany minimum duration",
+      "reviewerNote": "A video disclosure must remain on screen long enough to be read. Requires Sympany's minimum on-screen duration before it can be enforced.",
+      "suggestedFix": "Keep the disclosure on screen for at least the required minimum duration.",
+      "enabled": false
+    },
+    {
+      "id": "A-09",
+      "type": "requirement",
+      "title": "Product name matches approved register",
+      "description": "Product or insurance model name matches the Sympany approved-product register (KVG models and VVG products) exactly",
+      "severity": "Medium",
+      "status": "pending_config",
+      "dependency": "Needs Sympany approved-product register feed",
+      "detection": {
+        "modalities": ["image_text", "caption", "transcript"],
+        "signal": "Fuzzy match against product master; flags near-misses and retired product names",
+        "template": "entity",
+        "params": {
+          "check": "fuzzy_match_product_master"
+        }
+      },
+      "basis": "Needs Sympany approved-product register feed",
+      "reviewerNote": "Product and insurance model names must match the approved-product register exactly, to catch near-misses and retired names. Requires the approved-product register feed.",
+      "suggestedFix": "Use the exact approved product or model name from the current Sympany product register.",
+      "enabled": false
+    },
+    {
+      "id": "A-10",
+      "type": "requirement",
+      "title": "Copy aligns with approved copy library",
+      "description": "Copy aligns with the approved Sympany copy library for that product",
+      "severity": "Low",
+      "status": "pending_config",
+      "dependency": "Needs Sympany approved copy library feed",
+      "detection": {
+        "modalities": ["image_text", "caption", "transcript"],
+        "signal": "Similarity score against the approved copy corpus below threshold",
+        "template": "vision",
+        "params": {
+          "check": "copy_similarity_score"
+        }
+      },
+      "basis": "Needs Sympany approved copy library feed",
+      "reviewerNote": "Copy should align with the approved copy library for the product. Requires the approved copy library feed.",
+      "suggestedFix": "Bring the copy back in line with the approved copy library for that product.",
+      "enabled": false
+    },
+    {
+      "id": "A-11",
+      "type": "requirement",
+      "title": "Approved template or asset ID traceable",
+      "description": "The approved template or creative asset ID is traceable",
+      "severity": "Low",
+      "status": "pending_config",
+      "dependency": "Sympany marketing governance. Needs creative library",
+      "detection": {
+        "modalities": ["image_text", "video_frame_text"],
+        "signal": "Watermark or asset-ID lookup against the creative library",
+        "template": "vision",
+        "params": {
+          "check": "watermark_or_asset_id_lookup"
+        }
+      },
+      "basis": "Sympany marketing governance. Needs creative library",
+      "reviewerNote": "The approved template or creative asset ID must be traceable. Requires the creative library to look up.",
+      "suggestedFix": "Use an approved template with a traceable asset ID or watermark.",
+      "enabled": false
+    },
+    {
+      "id": "A-12",
+      "type": "requirement",
+      "title": "Lead route points to an official channel",
+      "description": "Lead or contact route points to an official Sympany channel (sympany.ch, mySympany, official social handles) — no cold-calling or third-party lead lists",
+      "severity": "Low",
+      "status": "pending_config",
+      "dependency": "Industry agreement on intermediaries (no cold calling). Needs maintained allowlist",
+      "detection": {
+        "modalities": ["caption", "image_text"],
+        "signal": "URL and social handle allowlist check",
+        "template": "entity",
+        "params": {
+          "check": "url_and_handle_allowlist"
+        }
+      },
+      "basis": "KVG/LAMal Art. 4a binding industry agreement on intermediaries (santésuisse / curafutura Branchenvereinbarung — ban on cold calling). Needs maintained allowlist",
+      "reviewerNote": "Lead and contact routes must point to an official Sympany channel; the binding industry agreement bans cold calling and the use of purchased lead lists. Requires a maintained URL and handle allowlist.",
+      "suggestedFix": "Point the lead or contact route to an official Sympany channel on the allowlist (e.g. sympany.ch or the mySympany app).",
+      "enabled": false
+    },
+    {
+      "id": "D-13",
+      "type": "prohibition",
+      "title": "Basic insurance advertised with gifts or bundling",
+      "description": "Basic insurance (KVG/LAMal) advertised with a gift, cash bonus or inducement, or made conditional on taking out supplementary insurance",
+      "severity": "High",
+      "status": "active",
+      "dependency": null,
+      "detection": {
+        "modalities": ["content_text", "image_text", "video_frame_text", "transcript", "caption"],
+        "signal": "Lexicon match on inducement or bundling wording: switching bonus, welcome gift, cash bonus, gift card, only together with supplementary insurance",
+        "template": "lexicon",
+        "params": {
+          "terms": ["switching bonus", "welcome gift", "cash bonus", "gift card", "only together with supplementary", "only with supplementary insurance"]
+        }
+      },
+      "basis": "KVG/LAMal Art. 4 & 7 (free choice of insurer, acceptance obligation); binding industry agreement on intermediaries (Branchenvereinbarung); FINMA supervision of supplementary insurance (VVG/LCA)",
+      "reviewerNote": "Every person must be accepted for basic insurance without conditions. Inducements to switch basic insurance, or making it conditional on supplementary insurance, breach the KVG and the industry agreement.",
+      "suggestedFix": "Remove the gift, bonus or bundling condition. Basic and supplementary insurance must be offered and concluded independently of each other.",
+      "enabled": true
+    }
+  ]
+}

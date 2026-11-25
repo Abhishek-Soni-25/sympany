@@ -1,0 +1,35 @@
+# AWS CodeBuild — builds the Docker image from the uploaded source zip and pushes it to ECR.
+#
+# Source: the release zip uploaded to S3 (e.g. s3://<release-bucket>/sympany-socmon.zip).
+# Project settings: privileged mode ON (Docker builds); environment variables:
+#   ECR_REPOSITORY_URI  e.g. 123456789012.dkr.ecr.eu-central-2.amazonaws.com/sympany-socmon
+#   CONTAINER_NAME      name of the web container in the ECS task definition (default "web")
+# Output: imagedefinitions.json for a CodePipeline "Amazon ECS" deploy action (web service).
+# The image is also tagged "latest": point the scan task definition at :latest so every
+# scheduled run uses the newest release.
+version: 0.2
+
+env:
+  variables:
+    CONTAINER_NAME: "web"
+
+phases:
+  pre_build:
+    commands:
+      - test -n "$ECR_REPOSITORY_URI" || (echo "Set ECR_REPOSITORY_URI on the CodeBuild project" && exit 1)
+      - aws ecr get-login-password --region "$AWS_DEFAULT_REGION" | docker login --username AWS --password-stdin "${ECR_REPOSITORY_URI%%/*}"
+      - IMAGE_TAG="$(date -u +%Y%m%d-%H%M%S)"
+      - echo "Building $ECR_REPOSITORY_URI:$IMAGE_TAG"
+  build:
+    commands:
+      - docker build -t "$ECR_REPOSITORY_URI:$IMAGE_TAG" -t "$ECR_REPOSITORY_URI:latest" .
+  post_build:
+    commands:
+      - docker push "$ECR_REPOSITORY_URI:$IMAGE_TAG"
+      - docker push "$ECR_REPOSITORY_URI:latest"
+      - printf '[{"name":"%s","imageUri":"%s"}]' "$CONTAINER_NAME" "$ECR_REPOSITORY_URI:$IMAGE_TAG" > imagedefinitions.json
+      - cat imagedefinitions.json
+
+artifacts:
+  files:
+    - imagedefinitions.json

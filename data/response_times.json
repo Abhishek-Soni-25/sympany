@@ -1,0 +1,261 @@
+{
+  "measured_at": "2026-11-13T16:20:39.919120+00:00",
+  "brands": {
+    "Sympany": {
+      "handle": "sympany",
+      "posts": 9,
+      "measured_at": "2026-11-13T16:19:48.340144+00:00",
+      "by_platform": {
+        "facebook": {
+          "comments": 45,
+          "replied": 13
+        },
+        "instagram": {
+          "comments": 21,
+          "replied": 5
+        }
+      },
+      "comments": 66,
+      "replied": 18,
+      "reply_rate": 27.3,
+      "avg_seconds": 402,
+      "median_seconds": 216
+    },
+    "Visana": {
+      "handle": "visana.versicherungen",
+      "posts": 9,
+      "measured_at": "2026-11-13T16:19:48.340144+00:00",
+      "by_platform": {
+        "facebook": {
+          "comments": 38,
+          "replied": 0
+        },
+        "instagram": {
+          "comments": 34,
+          "replied": 0
+        }
+      },
+      "comments": 72,
+      "replied": 0,
+      "reply_rate": 0.0,
+      "avg_seconds": null,
+      "median_seconds": null
+    },
+    "CSS": {
+      "handle": "CSS",
+      "posts": 9,
+      "measured_at": "2026-11-13T16:19:48.340144+00:00",
+      "by_platform": {
+        "facebook": {
+          "comments": 45,
+          "replied": 15
+        },
+        "instagram": {
+          "comments": 44,
+          "replied": 0
+        }
+      },
+      "comments": 89,
+      "replied": 15,
+      "reply_rate": 16.9,
+      "avg_seconds": 2963,
+      "median_seconds": 554
+    },
+    "SWICA": {
+      "handle": "swica_gesundheitsorganisation",
+      "posts": 9,
+      "measured_at": "2026-11-13T16:19:48.340144+00:00",
+      "by_platform": {
+        "facebook": {
+          "comments": 33,
+          "replied": 6
+        },
+        "instagram": {
+          "comments": 10,
+          "replied": 0
+        }
+      },
+      "comments": 43,
+      "replied": 6,
+      "reply_rate": 14.0,
+      "avg_seconds": 18256,
+      "median_seconds": 6504
+    },
+    "Helsana": {
+      "handle": "Helsana",
+      "posts": 6,
+      "measured_at": "2026-11-13T16:20:39.910275+00:00",
+      "by_platform": {
+        "instagram": {
+          "comments": 11,
+          "replied": 5
+        }
+      },
+      "comments": 11,
+      "replied": 5,
+      "reply_rate": 45.5,
+      "avg_seconds": 459,
+      "median_seconds": 538
+    }
+  },
+  "platforms": {
+    "facebook": {
+      "Sympany": {
+        "handle": "sympany",
+        "posts": 3,
+        "measured_at": "2026-11-13T16:19:48.340144+00:00",
+        "comments": 45,
+        "delays": [
+          114.0,
+          222.0,
+          776.0,
+          1112.0,
+          185.0,
+          774.0,
+          110.0,
+          91.0,
+          100.0,
+          101.0,
+          421.0,
+          340.0,
+          570.0
+        ]
+      },
+      "Visana": {
+        "handle": "visana.versicherungen",
+        "posts": 3,
+        "measured_at": "2026-11-13T16:19:48.340144+00:00",
+        "comments": 38,
+        "delays": []
+      },
+      "CSS": {
+        "handle": "CSS",
+        "posts": 3,
+        "measured_at": "2026-11-13T16:19:48.340144+00:00",
+        "comments": 45,
+        "delays": [
+          220.0,
+          1177.0,
+          26940.0,
+          1554.0,
+          58.0,
+          1132.0,
+          184.0,
+          188.0,
+          189.0,
+          1872.0,
+          1129.0,
+          305.0,
+          527.0,
+          8414.0,
+          554.0
+        ]
+      },
+      "SWICA": {
+        "handle": "swica_gesundheitsorganisation",
+        "posts": 3,
+        "measured_at": "2026-11-13T16:19:48.340144+00:00",
+        "comments": 33,
+        "delays": [
+          9733.0,
+          3274.0,
+          1817.0,
+          54262.0,
+          39868.0,
+          580.0
+        ]
+      }
+    },
+    "instagram": {
+      "Sympany": {
+        "handle": "sympany",
+        "posts": 6,
+        "measured_at": "2026-11-13T16:20:39.910275+00:00",
+        "comments": 21,
+        "delays": [
+          1464.0,
+          196.0,
+          249.0,
+          196.0,
+          210.0
+        ]
+      },
+      "CSS": {
+        "handle": "CSS",
+        "posts": 6,
+        "measured_at": "2026-11-13T16:20:39.910275+00:00",
+        "comments": 44,
+        "delays": []
+      },
+      "Helsana": {
+        "handle": "Helsana",
+        "posts": 6,
+        "measured_at": "2026-11-13T16:20:39.910275+00:00",
+        "comments": 11,
+        "delays": [
+          65.0,
+          36.0,
+          1057.0,
+          538.0,
+          600.0
+        ]
+      },
+      "Visana": {
+        "handle": "visana.versicherungen",
+        "posts": 6,
+        "measured_at": "2026-11-13T16:20:39.910275+00:00",
+        "comments": 34,
+        "delays": []
+      },
+      "SWICA": {
+        "handle": "swica_gesundheitsorganisation",
+        "posts": 6,
+        "measured_at": "2026-11-13T16:20:39.910275+00:00",
+        "comments": 10,
+        "delays": []
+      }
+    }
+  },
+  "history": [
+    {
+      "measured_at": "2026-11-13T16:20:39.919120+00:00",
+      "brands": {
+        "Sympany": {
+          "comments": 66,
+          "replied": 18,
+          "reply_rate": 27.3,
+          "avg_seconds": 402,
+          "median_seconds": 216
+        },
+        "Visana": {
+          "comments": 72,
+          "replied": 0,
+          "reply_rate": 0.0,
+          "avg_seconds": null,
+          "median_seconds": null
+        },
+        "CSS": {
+          "comments": 89,
+          "replied": 15,
+          "reply_rate": 16.9,
+          "avg_seconds": 2963,
+          "median_seconds": 554
+        },
+        "SWICA": {
+          "comments": 43,
+          "replied": 6,
+          "reply_rate": 14.0,
+          "avg_seconds": 18256,
+          "median_seconds": 6504
+        },
+        "Helsana": {
+          "comments": 11,
+          "replied": 5,
+          "reply_rate": 45.5,
+          "avg_seconds": 459,
+          "median_seconds": 538
+        }
+      }
+    }
+  ]
+}

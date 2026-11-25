@@ -1,0 +1,96 @@
+{
+  "own": {
+    "total": 18215,
+    "positive": 8186,
+    "neutral": 1355,
+    "negative": 8662,
+    "by_platform": {
+      "google_maps": 373,
+      "app_store": 614,
+      "play_store": 14757,
+      "x": 818,
+      "youtube": 31,
+      "facebook": 646,
+      "youtube_shorts": 205,
+      "quora": 84,
+      "instagram": 647,
+      "youtube_channel": 40
+    },
+    "failed": 12
+  },
+  "competitors": {
+    "CSS": {
+      "total": 4226,
+      "positive": 2279,
+      "neutral": 544,
+      "negative": 1402,
+      "by_platform": {
+        "x": 751,
+        "facebook": 323,
+        "youtube": 26,
+        "google_maps": 149,
+        "instagram": 301,
+        "youtube_shorts": 100,
+        "youtube_channel": 103,
+        "play_store": 1910,
+        "app_store": 500,
+        "quora": 63
+      },
+      "failed": 1
+    },
+    "Helsana": {
+      "total": 3884,
+      "positive": 1976,
+      "neutral": 399,
+      "negative": 1509,
+      "by_platform": {
+        "x": 683,
+        "instagram": 300,
+        "facebook": 91,
+        "google_maps": 133,
+        "youtube": 33,
+        "youtube_channel": 26,
+        "play_store": 1975,
+        "app_store": 498,
+        "quora": 72,
+        "youtube_shorts": 73
+      }
+    },
+    "Visana": {
+      "total": 4112,
+      "positive": 2746,
+      "neutral": 502,
+      "negative": 864,
+      "by_platform": {
+        "x": 762,
+        "facebook": 299,
+        "instagram": 301,
+        "youtube": 30,
+        "youtube_shorts": 100,
+        "google_maps": 113,
+        "play_store": 1958,
+        "app_store": 395,
+        "quora": 57,
+        "youtube_channel": 97
+      }
+    },
+    "SWICA": {
+      "total": 4129,
+      "positive": 2924,
+      "neutral": 408,
+      "negative": 797,
+      "by_platform": {
+        "facebook": 315,
+        "youtube": 28,
+        "x": 663,
+        "instagram": 301,
+        "google_maps": 192,
+        "play_store": 1958,
+        "youtube_shorts": 100,
+        "youtube_channel": 99,
+        "app_store": 418,
+        "quora": 55
+      }
+    }
+  }
+}

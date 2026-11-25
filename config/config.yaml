@@ -1,0 +1,588 @@
+# Runtime configuration. Secrets are NOT kept here: on AWS they come from SSM Parameter
+# Store (SecureString), locally from .env.
+#
+# The AWS deployment settings below default to the production setup in eu-central-2. Each
+# one can be overridden with an environment variable (shown in brackets) — local
+# development sets STORAGE_BACKEND=local, AUTH_MODE=none and SCAN_LAUNCH=local in .env.
+# AI always runs on Amazon Bedrock and Amazon Transcribe. See DEPLOY.md.
+
+features:
+  media_compliance: false            # [FEATURE_MEDIA_COMPLIANCE] Media Compliance pages + endpoints
+                                     # (hidden for now; the code is kept and can be switched on)
+
+aws:
+  region: eu-central-2               # [AWS_REGION] Europe (Zurich)
+
+storage:
+  backend: dynamodb                  # [STORAGE_BACKEND] dynamodb (AWS) | local (files under data/)
+  table: sympany-socmon-data         # [DYNAMODB_TABLE] posts, sentiment, risk, settings (TTL on posts)
+  audit_table: sympany-socmon-audit  # [DYNAMODB_AUDIT_TABLE] compliance audit, kept throughout
+  post_retention_days: 730           # [POST_RETENTION_DAYS] DynamoDB TTL on collected posts and cases
+
+transcription:
+  provider: aws                      # [TRANSCRIBE_PROVIDER] aws (Amazon Transcribe streaming)
+  language_options: [de-CH, fr-FR, it-IT, en-US]   # spoken language is identified among these
+  preferred_language: de-CH          # used if language identification is not accepted
+  stream_speed: 8                    # stream audio at up to 8x real time
+
+auth:
+  mode: password                     # [AUTH_MODE] password (app sign-in, accounts in APP_USERS)
+                                     # | alb (Cognito via the load balancer) | none (local only)
+  session_hours: 8                   # [SESSION_HOURS] sign-in lifetime (password mode)
+  admin_group: ""                    # [ADMIN_GROUP] alb mode only: Cognito group allowed to run
+                                     # scans / edit keywords; empty = every signed-in user
+
+scan:
+  launch: inline                     # [SCAN_LAUNCH] inline: scans run inside the web app (Run Scan
+                                     # + daily scan, one at a time via a DynamoDB lock) | ecs: as a
+                                     # separate ECS task (needs ecs:RunTask + iam:PassRole)
+  daily_at: ""                       # [SCAN_DAILY_AT] daily scan time, Swiss time, e.g. "06:00";
+                                     # empty = no daily scan (inline mode only)
+  parallel_fetch: 5                  # provider runs (Apify / Bright Data) asked at the same time
+  manual_per_day: 1                  # [SCAN_MANUAL_PER_DAY] successful Run Scan clicks allowed per
+                                     # Swiss calendar day, for everyone together; 0 = no limit.
+                                     # A scan that fails does not count, so it can be run again.
+
+# Catch-up: scans run when someone clicks Run Scan, so days can pass between two scans. Each
+# channel fetches the posts published since its last complete scan: the provider limit
+# (apify.actors.<actor>.limit_field, brightdata num_of_posts) is multiplied by the number of
+# days since then, and a full page that shares no post with earlier scans is fetched again
+# with twice the limit. Posts that may still be missing are noted in the logs.
+catchup:
+  max_days: 200                      # catch up the whole gap since the last scan, back to 10 May
+  max_fetch: 1000                    # most results one provider run may return (cost guard): enough
+                                     # for an account posting a few times a day since 10 May
+  margin_hours: 24                   # date filters start this long before the last complete scan
+
+media:                               # Media Compliance uploads (processed in memory, never stored)
+  max_upload_mb: 200
+  max_video_seconds: 600
+
+poll_interval_seconds: 120      # how often the continuous loop polls each connector
+max_items_per_poll: 80          # store up to this many items per channel per scan
+
+# Collection window — only content published in this range is kept in the knowledge base.
+# From 10 May 2026 onwards; leave `until` empty for no upper bound. Video/reel channels
+# (YouTube) are transcribed so their sentiment reflects the clip, not just the caption.
+collection:
+  since: "2026-05-10"
+  until: ""
+  backfill_days: 200                # first scan of a channel, account or new keyword looks back to
+                                    # collection.since (10 May 2026)
+  transcribe_video: true            # download + transcribe (Amazon Transcribe) videos without captions
+  max_video_mb: 20                  # skip a clip larger than this when transcribing
+  max_video_transcriptions: 10      # cap transcriptions per scan (cost control)
+
+# AI risk-analysis core
+analysis:
+  provider: bedrock                  # [AI_PROVIDER] Amazon Bedrock (In-Region models only)
+  bedrock:                           # Amazon Bedrock, In-Region in eu-central-2 (no cross-Region inference)
+    text_model: qwen.qwen3-235b-a22b-2507-v1:0   # [BEDROCK_TEXT_MODEL] sentiment, risk, language
+    vision_model: qwen.qwen3-vl-235b-a22b        # [BEDROCK_VISION_MODEL] image + video-frame OCR
+    requests_per_minute: 60          # pace a scan's classification calls
+  models: ["openai/gpt-oss-120b", "qwen/qwen3.8-27b", "openai/gpt-oss-20b"]   # Groq (local dev) fallback chain
+  max_tokens: 1024
+  review_ai_per_scan: 400       # low-rated app / agency reviews the AI reads per scan; the rest
+                                # get their sentiment from the star rating
+  max_retries: 3                # retries on throttling within one scan
+  failed_retry_limit: 10        # a post whose analysis failed is retried on up to this many
+                                # later scans (shown as "Failed" in the dashboard meanwhile)
+  # VADER compound score below which we still always send to the LLM regardless
+  # (negative content gets analyzed even if short).
+  negative_prefilter_threshold: -0.2
+
+# Media Compliance analyzer — reads creatives with the vision model (analysis.bedrock
+# on AWS) and screens them against the Do's and Don'ts.
+compliance:
+  max_tokens: 1600
+  frame_ocr_max: 12
+  frame_ocr_batch: 3   # qwen vision accepts at most 3 images per call
+  frame_fps: 1        # frames sampled per second before thinning to frame_ocr_max
+  frame_scan_cap: 90  # never decode more than this many frames from a clip
+  frame_width: 640    # downscale width for OCR frames (image tokens scale with resolution)
+
+# Monitoring target — every channel is narrowed to content about this organization.
+# Sympany: Swiss health insurer, head office in Basel (https://www.sympany.ch).
+target:
+  name: "Sympany"
+  # Content is considered relevant if it mentions any alias (case-insensitive), comes
+  # from an official handle, or arrives from a search query for the target.
+  aliases:
+    - "Sympany"
+    - "sympany.ch"
+    - "mySympany"
+    - "@sympany"
+  official_handles:           # treated as first-party (always relevant)
+    - "sympany"
+    - "UCgGVxswokKbu5E14xVqNiPg"   # Sympany's YouTube channel id
+  require_relevance: true     # drop content that doesn't reference the target
+  # A post matching one of the exclude_patterns (another organization with a similar name) is
+  # dropped unless it also names the target unambiguously (strong_aliases).
+  strong_aliases:
+    - "sympany"
+    - "sympany.ch"
+    - "mysympany"
+  # Phrases that contain the target's name without being about it (another company with the
+  # name inside its own, a street landmark). Sympany is a distinctive name, so none are needed.
+  namesake_phrases: []
+  exclude_patterns: []
+  # The brand's own accounts — follower counts (Marketing report) and first-level
+  # response time (Competition report) are read from these.
+  owned_accounts:
+    instagram: "sympany"
+    facebook: "https://www.facebook.com/sympany/"
+    youtube: "https://www.youtube.com/channel/UCgGVxswokKbu5E14xVqNiPg"   # channel URL, id or @handle
+
+# Alerting thresholds — minimum LLM confidence required to raise an alert at each tier.
+thresholds:
+  high_min_confidence: 0.70
+  medium_min_confidence: 0.55
+  low_min_confidence: 0.40
+
+# Keyword-based collection. A single keyword is submitted to each provider; these
+# default to the target aliases but can be overridden per channel.
+keywords:
+  - "Sympany"
+
+# Competitor set for Share-of-Voice benchmarking. Each is collected on the channels
+# below with its own keyword, counted and sentiment-scored (no risk mapping).
+competitors:
+  # Every competitor is collected on the same sources as Sympany: its own accounts (page /
+  # channel URL under the channel's name below), its apps' reviews (app id), its agencies on
+  # Google Maps, and keyword searches for its name on the other channels. A source whose key
+  # is missing from a competitor's entry is skipped for that competitor.
+  channels: ["instagram_official", "facebook_page", "youtube_channel", "youtube_shorts",
+             "instagram", "facebook", "quora", "x", "youtube", "play_store", "app_store", "google_maps"]
+  max_items: 30
+  # Most results per competitor and channel in one scan (cost guard; a channel's first scan
+  # loads the collection window up to this many).
+  max_fetch:
+    instagram_official: 300
+    facebook_page: 250
+    youtube_channel: 100
+    youtube_shorts: 100
+    instagram: 100
+    facebook: 150
+    quora: 100
+    x: 1000
+    youtube: 40
+    play_store: 2500
+    app_store: 500
+    google_maps: 1500
+  # First scan of a high-volume channel: up to per_window posts in every every_days window
+  # since collection.since, so each month is represented (a big insurer's app can get thousands
+  # of reviews a month).
+  backfill_sample:
+    x: {every_days: 30, per_window: 120, until_field: end}
+    play_store: {every_days: 10, per_window: 100, until_field: endDate}
+  # The AI reads up to this many public posts per competitor per scan; reviews take their
+  # sentiment from the stars, the rest from the local text scorer (src/competitors.py).
+  ai_per_brand_per_scan: 150
+  input_limits:                      # actor input overrides — bills per result, so cap here
+    instagram: {searchLimit: 25}
+    facebook: {max_results: 20}
+    facebook_page: {resultsLimit: 15}
+    quora: {maxItemsPerQuery: 20}
+    google_maps: {maxCrawledPlacesPerSearch: 60, maxReviews: 20}
+  # Official accounts below are taken from each insurer's own website. Play Store / App Store
+  # app ids are not verified for any competitor — set them (play_store, app_store) before
+  # scanning those sources.
+  set:
+    - name: "CSS"
+      keyword: "CSS Versicherung"
+      # "CSS" alone is ambiguous (style sheets): a keyword-search post must name the insurer.
+      aliases: ["css versicherung", "css krankenversicherung", "css insurance", "css.ch"]
+      place_names: ["css versicherung", "css krankenversicherung", "css insurance", "css.ch"]
+      # Instagram not verified — set instagram / instagram_official before scanning.
+      facebook_page: "https://www.facebook.com/css.gesundheitspartnerin"
+      youtube_channel: "https://www.youtube.com/c/cssch"
+      youtube_shorts: "https://www.youtube.com/c/cssch/shorts"
+      # Also official (not scanned): LinkedIn css_ch, TikTok @cssgesundheitspartnerin.
+    - name: "Helsana"
+      keyword: "Helsana"
+      aliases: ["helsana"]
+      place_names: ["helsana"]
+      # Add Helsana's official accounts (instagram, instagram_official, facebook_page,
+      # youtube_channel, youtube_shorts) before scanning; until then only keyword searches run.
+    - name: "SWICA"
+      keyword: "SWICA"
+      aliases: ["swica"]
+      place_names: ["swica"]
+      instagram: "swica_gesundheitsorganisation"   # follower count + reply times
+      instagram_official: "https://www.instagram.com/swica_gesundheitsorganisation/"
+      facebook_page: "https://www.facebook.com/swica.ch"
+      youtube_channel: "https://www.youtube.com/user/SWICAGesundheit"
+      youtube_shorts: "https://www.youtube.com/user/SWICAGesundheit/shorts"
+      # Also official (not scanned): TikTok @swica_de.
+    - name: "Visana"
+      keyword: "Visana"
+      aliases: ["visana"]
+      place_names: ["visana"]
+      instagram: "visana.versicherungen"
+      instagram_official: "https://www.instagram.com/visana.versicherungen/"
+      facebook_page: "https://www.facebook.com/visana.versicherungen"
+      youtube_channel: "https://www.youtube.com/@visana.versicherungen"
+      youtube_shorts: "https://www.youtube.com/@visana.versicherungen/shorts"
+
+# First-level response time: how quickly each brand's official accounts reply to comments
+# on their own posts — Instagram (instagram-comment-scraper) and Facebook
+# (facebook-comments-scraper, nested replies).
+response_time:
+  every_days: 7                      # measured once a week (it changes slowly); other scans reuse it
+  posts_per_brand: 6                 # Instagram: most recent posts that have comments
+  comments_per_post: 15              # billed per comment (~$0.0026 each); ~15 come back without a login
+  facebook_posts_per_brand: 3        # Facebook: own page posts at least a day old, most-commented first
+  facebook_comments_per_post: 15     # billed per comment (~$0.0025 each)
+
+# Legacy: live Reddit + LinkedIn via an n8n Google-search agent. Not used in production
+# (Apify / Bright Data below); set a webhook here only if a channel is switched to mode: n8n.
+n8n:
+  webhook_url: ""
+
+# --- Bright Data Web Scraper (async job model) — YouTube keyword discovery ---
+brightdata:
+  poll_timeout_seconds: 360     # YouTube keyword discovery regularly needs 3-5 min
+  datasets:
+    reddit_posts:     "gd_lvz8ah06191smkebj4"   # Reddit — discover posts by keyword
+    youtube_videos:   "gd_lk56epmy2i5g7lzu0k"   # YouTube — discover videos by keyword
+    youtube_channels: "gd_lk538t2k2p1k3oos71"   # YouTube — discover channels by keyword
+
+# --- Apify Actors (async actor run) — Instagram, Quora, Facebook, YouTube channel ---
+# Actor ids and input schemas taken from the actor readmes. Each actor is normalised
+# per-platform in src/connectors/apify_connector.py to only the fields we use.
+apify:
+  run_timeout_seconds: 1500            # a full back-fill of an account (hundreds of posts) takes 10+ min
+  actors:
+    instagram:                              # apify/instagram-search-scraper — popular posts/reels for a keyword
+      id: "apify/instagram-search-scraper"  # (replaces crawlerbros OQkrGAtl0AfRFKnJr, removed from Apify)
+      keyword_field: search
+      keyword_as_list: false                # one run per keyword
+      input_template:
+        searchType: popular                 # "popular" returns posts; hashtag/user/place return pages
+        searchLimit: 30                     # $0.0027 per result
+      limit_field: searchLimit              # scaled by the catch-up (see catchup:)
+      max_limit: 250                        # the actor rejects a larger searchLimit
+    telegram:                               # telegram keyword search scraper (near-free)
+      id: "kCdMrRb7UiSRSFYeO"
+      keyword_field: keywords
+      keyword_as_list: true
+      input_template:
+        mode: keyword
+        afterDate: "180 days"              # wider window
+        maxResultsPerKeyword: 100
+    linkedin:                               # harvestapi/linkedin-post-search — $0.002/post (cheap)
+      id: "buIWk2uOUzTmcLsuB"
+      keyword_field: searchQueries
+      keyword_as_list: true
+      input_template:
+        postedLimit: "3months"             # widest window this actor supports reliably
+        sortBy: "date"
+        maxPosts: 120
+        scrapeReactions: false
+        scrapeComments: false
+    quora:                                  # fatihtahta/quora-scraper — NO cookies, $0.99/1k results
+      id: "fatihtahta/quora-scraper"        # (crawlerbros actor needs fresh session cookies; ours expired)
+      keyword_field: queries
+      keyword_as_list: true
+      input_template:
+        searchType: "All types"             # questions + answers + posts
+        timeFilter: "Past Year"             # narrowest filter ≥ our window; post-filtered to 3 months
+        maxItemsPerQuery: 40
+      limit_field: maxItemsPerQuery
+    facebook:                               # scrapeforge/facebook-search-posts — public post search, no cookies
+      id: "scrapeforge/facebook-search-posts"
+      keyword_field: query
+      keyword_as_list: false
+      input_template:
+        search_type: "posts"
+        max_results: 50                     # $2.59 per 1,000 results
+        recent_posts: true
+        start_date: "2026-05-10"            # start of the collection window (post-filtered too)
+      limit_field: max_results
+      since_field: start_date               # moved up to the last complete scan (never before 2026-05-10)
+    youtube_videos:                         # apidojo/youtube-scraper — a channel's uploaded videos
+      id: "apidojo/youtube-scraper"         # input: startUrls = [<channel>/videos]
+      keyword_field: startUrls
+      keyword_as_list: true
+      input_template:
+        maxItems: 40                        # newest-first; window-filtered to the last 3 months
+      limit_field: maxItems
+    youtube_shorts:                         # streamers/youtube-shorts-scraper — a channel's Shorts
+      id: "streamers/youtube-shorts-scraper"  # input: channels = [<channel>/shorts]
+      keyword_field: channels
+      keyword_as_list: true
+      input_template:
+        maxResultsShorts: 40                # the actor's Shorts limit (it ignores maxResults and
+                                            # defaults to 1 Short per run)
+      limit_field: maxResultsShorts
+      max_limit: 400                        # no date filter on this actor: ~1.5 Shorts a day since
+                                            # 10 May; older ones are dropped by the collection window
+    facebook_page:                          # apify/facebook-posts-scraper — a page's own posts
+      id: "apify/facebook-posts-scraper"    # $0.005 per post
+      keyword_field: startUrls
+      keyword_as_list: true
+      url_objects: true                     # startUrls = [{"url": <page>}]
+      input_template:
+        resultsLimit: 20
+        onlyPostsNewerThan: "2026-05-10"    # start of the collection window
+      limit_field: resultsLimit
+      since_field: onlyPostsNewerThan       # moved up to the last complete scan
+    facebook_comments:                      # apify/facebook-comments-scraper — comments + replies
+      id: "apify/facebook-comments-scraper" # $0.0025 per comment
+    instagram_profile:                      # apify/instagram-profile-scraper — followers + latest posts
+      id: "apify/instagram-profile-scraper" # $0.0026 per profile
+    instagram_posts:                        # apify/instagram-post-scraper — an account's posts
+      id: "apify/instagram-post-scraper"    # $0.0017 per post; reply-time fallback
+    instagram_scraper:                      # apify/instagram-scraper — profile / hashtag URLs
+      id: "apify/instagram-scraper"         # ~$2.30 per 1,000 results
+      keyword_field: directUrls
+      keyword_as_list: true
+      input_template:
+        resultsType: posts                  # a channel may override (mentions = posts tagging the account)
+        resultsLimit: 30                    # per URL; scaled by the catch-up
+        onlyPostsNewerThan: "2026-05-10"    # start of the collection window
+      limit_field: resultsLimit
+      since_field: onlyPostsNewerThan       # moved up to the last complete scan
+    youtube_streamers:                      # streamers/youtube-scraper — a channel's videos and live streams
+      id: "streamers/youtube-scraper"       # ~$2.40-4 per 1,000 videos
+      keyword_field: startUrls
+      keyword_as_list: true
+      url_objects: true                     # startUrls = [{"url": <channel>}]
+      input_template:
+        maxResults: 40                      # regular videos; scaled by the catch-up
+        maxResultsShorts: 0                 # Shorts come from youtube_shorts below
+        maxResultStreams: 10
+        oldestPostDate: "2026-05-10"        # start of the collection window
+      limit_field: maxResults
+      since_field: oldestPostDate           # moved up to the last complete scan
+    instagram_comments:                     # apify/instagram-comment-scraper — comments + replies
+      id: "apify/instagram-comment-scraper" # $0.0026 per comment
+    facebook_page_info:                     # apify/facebook-pages-scraper — page follower count
+      id: "apify/facebook-pages-scraper"    # $0.012 per page
+    x_search:                               # apidojo/tweet-scraper — tweets for search terms
+      id: "apidojo/tweet-scraper"           # $0.0004 per tweet
+      keyword_field: searchTerms
+      keyword_as_list: true
+      input_template:
+        sort: "Latest"
+        maxItems: 100                       # scaled by the catch-up
+        start: "2026-05-10"                 # start of the collection window
+      limit_field: maxItems
+      since_field: start                    # moved up to the last complete scan
+    google_maps:                            # compass/crawler-google-places — agencies + reviews
+      id: "compass/crawler-google-places"   # $0.004 per agency + per review
+      keyword_field: searchStringsArray
+      keyword_as_list: true
+      input_template:
+        locationQuery: "Switzerland"
+        maxCrawledPlacesPerSearch: 200      # agencies per scan (Google shows ~200 per search)
+        maxReviews: 50                      # newest reviews per agency, since reviewsStartDate
+        reviewsSort: "newest"
+        reviewsStartDate: "2026-05-10"      # start of the collection window
+        language: "en"
+      since_field: reviewsStartDate         # moved up to the last complete scan
+    play_store:                             # neatrat/google-play-store-reviews-scraper
+      id: "neatrat/google-play-store-reviews-scraper"   # $0.00015 per review
+      keyword_field: appIdOrUrl
+      keyword_as_list: false                # one app per run (a string)
+      input_template:
+        sortBy: "newest"
+        deviceType: "mobile"
+        reviewsPerPage: 100
+        pagesToScrape: -1
+        maxReviews: 100                     # newest first; scaled by the catch-up
+      limit_field: maxReviews
+    app_store:                              # thewolves/appstore-reviews-scraper
+      id: "thewolves/appstore-reviews-scraper"   # $0.0001 per review
+      keyword_field: appIds
+      keyword_as_list: true
+      input_template:
+        country: "ch"                       # the Swiss App Store
+        maxItems: 50                        # newest first (Apple lists ~500); scaled by catch-up
+      limit_field: maxItems
+
+# Which channels to run and how.
+#   mode: brightdata -> Bright Data dataset (keyword discovery)
+#   mode: apify      -> Apify Actor run (keyword search)
+#   mode: live       -> the channel's own official-API connector (e.g. X via tweepy)
+#   mode: n8n        -> legacy n8n webhook (reddit + linkedin)
+#   mode: demo       -> sample pool in data/demo_samples.json
+# A channel is skipped with a warning if its provider key is missing or still PLACEHOLDER
+# (Parameter Store /sympany-socmon/APIFY_TOKEN, /sympany-socmon/BRIGHTDATA_API_KEY). The
+# youtube_channel connector needs no key.
+# Sympany scope: YouTube, Quora, Facebook, Instagram, X, app and Google Maps reviews.
+channels:
+  # --- Sympany's own accounts (official: true). Scanned first in every scan, so owned
+  # content is always collected even if a later channel fails. ---
+  # Sympany's own Instagram posts (owned content) — stored as platform "instagram".
+  instagram_official:
+    enabled: true
+    official: true                # Sympany's own account: scanned first
+    mode: apify
+    actor: instagram_scraper
+    normalizer: instagram
+    platform: instagram
+    first_party: true
+    state_key: instagram_official_v2   # new scraper: its first scan looks back 3 months
+    keywords: ["https://www.instagram.com/sympany/"]
+  # Sympany's own Facebook page posts (owned content) — stored as platform "facebook".
+  facebook_page:
+    enabled: true
+    official: true                # Sympany's own account: scanned first
+    mode: apify
+    actor: facebook_page
+    normalizer: facebook_page
+    platform: facebook
+    first_party: true
+    keywords: ["https://www.facebook.com/sympany/"]
+  # Sympany's own YouTube videos and live streams via streamers/youtube-scraper (every
+  # upload since the last scan, with views / likes / comments; the RSS feed it replaces
+  # listed only the latest 15 uploads and no engagement).
+  youtube_channel:
+    enabled: true
+    official: true                # Sympany's own account: scanned first
+    mode: apify
+    actor: youtube_streamers
+    normalizer: youtube_streamers
+    platform: youtube_channel
+    first_party: true
+    state_key: youtube_channel_v2   # new scraper: its first scan looks back 3 months
+    keywords: ["https://www.youtube.com/channel/UCgGVxswokKbu5E14xVqNiPg"]
+  # Sympany's own YouTube Shorts via streamers/youtube-shorts-scraper.
+  youtube_shorts:
+    enabled: true
+    official: true                # Sympany's own account: scanned first
+    mode: apify
+    actor: youtube_shorts
+    first_party: true
+    keywords: ["https://www.youtube.com/channel/UCgGVxswokKbu5E14xVqNiPg/shorts"]
+  # --- Public mentions: who else talks about Sympany. ---
+  # Posts by others that tag @sympany, and posts with Sympany's hashtag (apify/instagram-scraper).
+  instagram_tagged:
+    enabled: true
+    mode: apify
+    actor: instagram_scraper
+    extra_input: {resultsType: mentions}
+    normalizer: instagram
+    platform: instagram
+    scoped: true                  # tagged / hashtag posts are about Sympany by definition
+    keywords: ["https://www.instagram.com/sympany/"]
+  instagram_hashtag:
+    enabled: true
+    mode: apify
+    actor: instagram_scraper
+    normalizer: instagram
+    platform: instagram
+    scoped: true
+    keywords: ["https://www.instagram.com/explore/tags/sympany/"]
+  # Keyword search (popular posts for "Sympany" and the Campaign keywords).
+  instagram:
+    enabled: true
+    mode: apify
+    actor: instagram
+  # X (Twitter): tweets naming the insurer (the AI reads every tweet). Sympany's X handle is
+  # not verified — add it here before scanning if it has one.
+  x:
+    enabled: true
+    mode: apify
+    actor: x_search
+    keywords: ['"Sympany"', "#Sympany"]
+  # Reviews: sentiment from the star rating; the AI reads low-rated reviews for risk, up to
+  # analysis.review_ai_per_scan per scan (src/main.py).
+  play_store:                     # mySympany on Google Play
+    enabled: true
+    mode: apify
+    actor: play_store
+    scoped: true                  # every review is about the insurer's app
+    max_fetch: 15000              # cap for a first scan back to 10 May
+    keywords: ["ch.sympany.clientportal"]
+  app_store:                      # mySympany on the Swiss App Store
+    enabled: false                # App Store id not verified — set it below, then enable
+    mode: apify
+    actor: app_store
+    scoped: true
+    max_fetch: 2000
+    keywords: []                  # mySympany App Store id (set before scanning)
+  google_maps:                    # Sympany agencies across Switzerland and their reviews
+    enabled: true
+    mode: apify
+    actor: google_maps
+    scoped: true                  # every agency named below is the insurer's
+    place_must_contain: ["sympany"]
+    keywords: ["Sympany"]
+  quora:
+    enabled: true
+    mode: apify
+    actor: quora
+    keywords: ["Sympany"]
+  facebook:
+    enabled: true
+    mode: apify
+    actor: facebook
+  linkedin:
+    enabled: false
+    mode: apify
+    actor: linkedin
+  telegram:
+    enabled: false
+    mode: apify
+    actor: telegram
+  reddit:
+    enabled: false
+    mode: brightdata
+    dataset: reddit_posts
+    extra_input:
+      date: "Past month"
+      sort_by: "New"
+      num_of_posts: 60
+  youtube:
+    enabled: true
+    mode: brightdata
+    dataset: youtube_videos
+    extra_input:
+      country: "CH"
+      num_of_posts: 40            # cap YouTube records to control cost
+  tiktok:
+    enabled: false
+    mode: apify
+    actor: tiktok
+
+# LinkedIn scraper (ToS-gated). DISABLED.
+linkedin:
+  tos_acknowledged: false       # set true ONLY if you accept the ToS/account/legal risk
+  company: "sympany"
+
+# Privacy / compliance controls
+privacy:
+  hash_author_ids: true         # SHA-256 pseudonymize author identifiers in stored cases
+  retention_days: 90            # local only: purge case files older than this on startup
+                                # (on AWS, storage.post_retention_days sets the DynamoDB TTL)
+
+# RACM control + KRI reference for each risk category (drop in your real refs)
+racm_mapping:
+  REPUTATIONAL:
+    racm_ref: "RACM-REP-01"
+    kri_ref: "KRI-REP-NEGSENT"
+  COMPLIANCE_CONDUCT:
+    racm_ref: "RACM-CMP-04"
+    kri_ref: "KRI-CMP-VIOL"
+  MARKET_ABUSE:
+    racm_ref: "RACM-MAB-02"
+    kri_ref: "KRI-MAB-SUSP"
+  CYBER_OPERATIONAL:
+    racm_ref: "RACM-CYB-03"
+    kri_ref: "KRI-CYB-LEAK"
+
+# Escalation recipients (prototype LogEscalator just records these)
+escalation:
+  high:   ["compliance-duty@sympany.example", "soc@sympany.example"]
+  medium: ["risk-review@sympany.example"]
+  sns_tiers: [HIGH]             # published to the SNS alert topic (ALERT_TOPIC_ARN) and e-mailed
+  run_summary: always           # scan summary e-mail after every successful scan (Run Scan):
+                                # always | new_only (only when new posts were found) | off.
+                                # A failed scan is always e-mailed.
+  dashboard_url: ""             # link in the summary e-mail (env DASHBOARD_URL); empty = none
+  viral:                        # one e-mail per scan for negative / risky posts (any severity
+    enabled: true               # but NONE) that passed one of these numbers; each post alerts once
+    max_age_days: 7             # only posts published within the last 7 days
+    thresholds: {views: 10000, likes: 1000, comments: 200, shares: 200}

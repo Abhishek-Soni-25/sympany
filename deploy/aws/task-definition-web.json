@@ -1,0 +1,47 @@
+{
+  "family": "sympany-socmon-web",
+  "requiresCompatibilities": ["FARGATE"],
+  "networkMode": "awsvpc",
+  "cpu": "1024",
+  "memory": "4096",
+  "runtimePlatform": {"operatingSystemFamily": "LINUX", "cpuArchitecture": "X86_64"},
+  "executionRoleArn": "<ECS_TASKS_ROLE_ARN>",
+  "taskRoleArn": "<ECS_TASKS_ROLE_ARN>",
+  "containerDefinitions": [
+    {
+      "name": "web",
+      "image": "123456789012.dkr.ecr.eu-central-2.amazonaws.com/sympany-socmon:latest",
+      "essential": true,
+      "portMappings": [{"containerPort": 8080, "protocol": "tcp"}],
+      "environment": [
+        {"name": "AWS_REGION", "value": "eu-central-2"},
+        {"name": "DYNAMODB_TABLE", "value": "sympany-socmon-data"},
+        {"name": "DYNAMODB_AUDIT_TABLE", "value": "sympany-socmon-audit"},
+        {"name": "AUTH_MODE", "value": "password"},
+        {"name": "SESSION_HOURS", "value": "8"},
+        {"name": "FEATURE_MEDIA_COMPLIANCE", "value": "false"},
+        {"name": "SCAN_LAUNCH", "value": "inline"},
+        {"name": "ALERT_TOPIC_ARN", "value": "arn:aws:sns:eu-central-2:123456789012:sympany-socmon-alerts"}
+      ],
+      "secrets": [
+        {"name": "APP_USERS", "valueFrom": "arn:aws:ssm:eu-central-2:123456789012:parameter/sympany-socmon/APP_USERS"},
+        {"name": "SESSION_SECRET", "valueFrom": "arn:aws:ssm:eu-central-2:123456789012:parameter/sympany-socmon/SESSION_SECRET"},
+        {"name": "APIFY_TOKEN", "valueFrom": "arn:aws:ssm:eu-central-2:123456789012:parameter/sympany-socmon/APIFY_TOKEN"},
+        {"name": "BRIGHTDATA_API_KEY", "valueFrom": "arn:aws:ssm:eu-central-2:123456789012:parameter/sympany-socmon/BRIGHTDATA_API_KEY"}
+      ],
+      "linuxParameters": {"initProcessEnabled": true},
+      "healthCheck": {
+        "command": ["CMD-SHELL", "python -c \"import urllib.request;urllib.request.urlopen('http://127.0.0.1:8080/api/health', timeout=4)\""],
+        "interval": 30, "timeout": 5, "retries": 3, "startPeriod": 40
+      },
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/sympany-socmon-web",
+          "awslogs-region": "eu-central-2",
+          "awslogs-stream-prefix": "web"
+        }
+      }
+    }
+  ]
+}
